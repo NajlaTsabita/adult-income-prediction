@@ -1,6 +1,6 @@
 # Adult Income Prediction
 
-An end-to-end machine learning pipeline that predicts whether an adult's annual income exceeds **$50K** (**>50K** vs **<=50K**) from census data, featuring **XGBoost** optimization and export of test set predictions.
+A machine learning pipeline that predicts whether an adult's annual income exceeds **$50K** (**>50K** vs **<=50K**) from census data, featuring **XGBoost** optimization and export of test set predictions.
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![XGBoost](https://img.shields.io/badge/Model-XGBoost-orange)
@@ -10,16 +10,17 @@ An end-to-end machine learning pipeline that predicts whether an adult's annual 
 
 ## 📌 Overview
 
-This project builds a reproducible binary classification pipeline on the Census Income (Adult) dataset. It covers exploratory data analysis, preprocessing, model training and comparison, hyperparameter tuning, evaluation, and generating predictions for the test set.
+This project builds a binary classification pipeline on the Census Income (Adult) dataset. It covers exploratory data analysis, preprocessing, training and comparing three models, evaluating them on a held-out validation split, and generating predictions for the test set with the best-performing model (XGBoost).
 
 **Primary evaluation metric:** macro F1-score.
 
 ## 📂 Dataset
 
-The project uses the Census Income (Adult) dataset, split into training and test sets.
+The project uses the Census Income (Adult) dataset, provided as a training set (`train.csv`) and a test set (`test.csv`, which includes an `id` column and no target).
 
 - **Target:** `income` → `<=50K` or `>50K`
-- **Features:** a mix of numerical (e.g. `age`, `hours-per-week`, `capital-gain`, `capital-loss`) and categorical variables (e.g. `workclass`, `education`, `marital-status`, `occupation`, `relationship`, `race`, `sex`, `native-country`)
+- **Numerical features:** e.g. `age`, `hours-per-week`, `capital-gain`, `capital-loss`
+- **Categorical features:** `workclass`, `education`, `marital-status`, `occupation`, `relationship`, `race`, `sex`, `native-country`
 
 > Original source: [UCI Machine Learning Repository – Adult](https://archive.ics.uci.edu/dataset/2/adult)
 
@@ -27,9 +28,9 @@ The project uses the Census Income (Adult) dataset, split into training and test
 
 ```
 adult-income-prediction/
-├── data/        # Training and test datasets
-├── notebook/    # Jupyter notebook: EDA, preprocessing, modeling, evaluation
-├── output/      # Exported test set predictions (.csv)
+├── data/        # train.csv and test.csv
+├── notebook/    # adult_income_prediction.ipynb
+├── output/      # predictions.csv
 ├── report/      # Technical report (.pdf)
 ├── .gitignore
 └── README.md
@@ -38,33 +39,38 @@ adult-income-prediction/
 ## ⚙️ Pipeline
 
 1. **Exploratory Data Analysis**
-   - Data types, unique values of categorical columns, and target distribution.
-   - Detection of missing or invalid values (e.g. `?`) in columns such as `workclass`, `occupation`, and `native-country`.
-   - Income patterns across education, occupation, working hours, and capital gain.
+   - Data shape, types, summary statistics, and missing values, including `?` placeholders in categorical columns.
+   - Target class distribution.
+   - Correlation heatmap, histograms, boxplots, and a pair plot for numerical features.
+   - Count plots of each categorical feature split by income class.
 2. **Preprocessing**
-   - Missing value handling.
-   - One-hot encoding of categorical features, applied consistently to train and test data so both share the same columns.
-   - Scaling of numerical features, with the scaler fitted on the training data only to avoid data leakage.
+   - Rows containing `?` or null values are removed from the training data.
+   - Target labels are normalized to binary values (`<=50K` → 0, `>50K` → 1), also covering label variants with a trailing period.
+   - Categorical features are one-hot encoded (`drop_first=True`).
+   - Stratified 80/20 train/validation split (`random_state=42`).
+   - Numerical features are standardized with `StandardScaler`, fitted on the training split only to avoid data leakage.
 3. **Modeling**
-   - Baselines: Logistic Regression and Random Forest.
-   - Main model: **XGBoost**.
-4. **Optimization**
-   - Hyperparameter tuning of XGBoost with cross-validation.
-5. **Evaluation**
-   - Macro F1-score, classification report, and confusion matrix on validation data.
-6. **Prediction Export**
-   - Predictions for the test set are saved as a CSV file in `output/`.
+   - **Logistic Regression** (multi-feature baseline)
+   - **Random Forest** (100 trees, `class_weight='balanced'`)
+   - **XGBoost** (400 estimators, `max_depth=8`, `learning_rate=0.1`, `scale_pos_weight` set from the class ratio to handle class imbalance)
+4. **Evaluation**
+   - Classification report and macro F1-score.
+   - Confusion matrix, ROC curve, and precision-recall curve for each model.
+5. **Prediction Export**
+   - The test set is encoded and scaled with the same transformations as the training data, and its columns are aligned to the training feature set.
+   - XGBoost predictions are saved to `output/predictions.csv` with columns `id` and `income`.
 
 ## 📊 Results
 
-| Model | Macro F1 (Validation) |
-| --- | --- |
-| Logistic Regression | _TBD_ |
-| Random Forest | _TBD_ |
-| XGBoost (default) | _TBD_ |
-| **XGBoost (tuned)** | **_TBD_** |
+Macro F1-score on the held-out validation split (20% of the training data):
 
-Detailed analysis and conclusions are available in the technical report inside [`report/`](report/).
+| Model | Macro F1 |
+| --- | --- |
+| Logistic Regression (multi-feature) | 0.7855 |
+| Random Forest | 0.7902 |
+| **XGBoost** | **0.8049** |
+
+XGBoost achieved the best score and was used to generate the final test set predictions. Detailed analysis and conclusions are available in the technical report inside [`report/`](report/).
 
 ## 🚀 Getting Started
 
@@ -92,22 +98,24 @@ pip install pandas numpy scikit-learn xgboost matplotlib seaborn jupyter
 ### 4. Run the notebook
 
 ```bash
-jupyter notebook notebook/
+cd notebook
+jupyter notebook adult_income_prediction.ipynb
 ```
 
-Make sure the dataset files are placed in the `data/` folder, then run all cells in order (*Restart & Run All*). The prediction file will be generated in `output/`.
+The notebook reads data from `../data/` and writes predictions to `../output/`, so launch it from inside the `notebook/` folder. Run all cells in order (*Restart & Run All*) to reproduce the results.
 
 ## 🛠️ Tech Stack
 
 - **Python**
 - **pandas**, **NumPy** — data manipulation
-- **scikit-learn** — preprocessing, baseline models, evaluation
+- **scikit-learn** — preprocessing, Logistic Regression, Random Forest, evaluation
 - **XGBoost** — main model
 - **Matplotlib**, **Seaborn** — visualization
 - **Jupyter Notebook** — development environment
 
 ## 👤 Author
 
+**Najla Tsabita Afiyah**
 GitHub: [@NajlaTsabita](https://github.com/NajlaTsabita)
 
 ---
